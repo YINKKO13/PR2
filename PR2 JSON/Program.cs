@@ -1,0 +1,215 @@
+﻿using System.Net.Http.Json;
+
+namespace PR2_JSON
+{
+    class Program
+    {
+        static readonly HttpClient client = new HttpClient();
+        static async Task Main(string[] args)
+        {
+            while (true)
+            {
+                Console.WriteLine();
+                Console.WriteLine("1. Показать задачи пользователя");
+                Console.WriteLine("2. Найти задачу по ID");
+                Console.WriteLine("3. Создать задачу");
+                Console.WriteLine("4. Изменить статус задачи");
+                Console.WriteLine("5. Удалить задачу");
+                Console.WriteLine("0. Выход");
+                Console.Write("Выберите действие: ");
+
+                string? choice = Console.ReadLine();
+
+                if (choice == "0")
+                    break;
+
+                try
+                {
+                    switch (choice)
+                    {
+                        case "1":
+                            Console.Clear();
+                            await ShowTodos();
+                            break;
+
+                        case "2":
+                            Console.Clear();
+                            await FindTodo();
+                            break;
+
+                        case "3":
+                            Console.Clear();
+                            await CreateTodo();
+                            break;
+
+                        case "4":
+                            Console.Clear();
+                            await UpdateTodo();
+                            break;
+
+                        case "5":
+                            Console.Clear();
+                            await DeleteTodo();
+                            break;
+
+                        default:
+                            Console.WriteLine("Неверный пункт меню!");
+                            break;
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine("Ошибка сети: " + ex.Message);
+                }
+                catch (TaskCanceledException)
+                {
+                    Console.WriteLine("Время ожидания истекло.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Ошибка: " + ex.Message);
+                }
+            }
+
+            client.Dispose();
+        }
+        private static async Task ShowTodos()
+        {
+            Console.Write("Введите ID пользователя: ");
+            int userId = int.Parse(Console.ReadLine()!);
+
+            HttpResponseMessage response =
+                await client.GetAsync(
+                    $"https://jsonplaceholder.typicode.com/todos?userId={userId}"
+                );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Ошибка получения задач!");
+                return;
+            }
+
+            List<Todo>? todos =
+                await response.Content.ReadFromJsonAsync<List<Todo>>();
+
+            if (todos == null)
+            {
+                Console.WriteLine("Нет данных");
+                return;
+            }
+
+            foreach (Todo todo in todos)
+            {
+                Console.WriteLine(
+                    $"ID: {todo.Id}, Название: {todo.Title}, Выполнена: {todo.Completed}"
+                );
+            }
+        }
+        private static async Task FindTodo()
+        {
+            Console.Write("Введите ID задачи: ");
+            int id = int.Parse(Console.ReadLine()!);
+
+            HttpResponseMessage response =
+                await client.GetAsync(
+                    $"https://jsonplaceholder.typicode.com/todos/{id}"
+                );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Задача не найдена!");
+                return;
+            }
+
+            Todo? todo = await response.Content.ReadFromJsonAsync<Todo>();
+
+            if (todo != null)
+            {
+                Console.WriteLine($"ID: {todo.Id}");
+                Console.WriteLine($"Название: {todo.Title}");
+                Console.WriteLine($"Выполнена: {todo.Completed}");
+            }
+
+        }
+        private static async Task CreateTodo()
+        {
+            Console.Write("ID пользователя: ");
+            int userId = int.Parse(Console.ReadLine()!);
+
+            Console.Write("Название задачи: ");
+            string title = Console.ReadLine() ?? "";
+
+            Todo newTodo = new Todo
+            {
+                UserId = userId,
+                Title = title,
+                Completed = false
+            };
+
+            HttpResponseMessage response =
+                await client.PostAsJsonAsync(
+                    "https://jsonplaceholder.typicode.com/todos",
+                    newTodo
+                );
+
+            if (response.IsSuccessStatusCode)
+            {
+                Todo? created =
+                    await response.Content.ReadFromJsonAsync<Todo>();
+
+                Console.WriteLine($"Задача создана! ID: {created?.Id}");
+            }
+            else
+            {
+                Console.WriteLine("Ошибка создания задачи!");
+            }
+        }
+        private static async Task UpdateTodo()
+        {
+            Console.Write("ID задачи: ");
+            int id = int.Parse(Console.ReadLine()!);
+
+            Console.Write("Задача выполнена? (true/false): ");
+            bool completed = bool.Parse(Console.ReadLine()!);
+
+            var data = new
+            {
+                completed = completed
+            };
+
+            HttpResponseMessage response =
+                await client.PatchAsJsonAsync(
+                    $"https://jsonplaceholder.typicode.com/todos/{id}",
+                    data
+                );
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Статус изменён!");
+            }
+            else
+            {
+                Console.WriteLine("Ошибка изменения!");
+            }
+        }
+        private static async Task DeleteTodo()
+        {
+            Console.Write("ID задачи: ");
+            int id = int.Parse(Console.ReadLine()!);
+
+            HttpResponseMessage response =
+                await client.DeleteAsync(
+                    $"https://jsonplaceholder.typicode.com/todos/{id}"
+                );
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Задача удалена!");
+            }
+            else
+            {
+                Console.WriteLine("Ошибка удаления!");
+            }
+        }
+    }
+}
